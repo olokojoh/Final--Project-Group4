@@ -160,7 +160,8 @@ G = Generator(gpu).to(device)
 
 G.load_state_dict(torch.load(model,map_location={'cuda:0': 'cpu'})['G'])
 
-test_img_path = '../Data/Train_1/001_L.png'
+# %%
+test_img_path = '../Data/Test/003_L.png'
 test_img = cv2.cvtColor(cv2.resize(cv2.imread(test_img_path), (256, 256)), cv2.COLOR_BGR2LAB)/255
 test_img_L = test_img[..., 0].reshape(1, 1,256,256)
 img_variable = Variable(torch.Tensor(test_img_L))
@@ -172,16 +173,16 @@ ab = ab*255
 # %%
 gen_lab_img = np.transpose(np.vstack((test_img_L[0,...]*255, ab[0,...])), (1, 2, 0))
 gen_lab_img = gen_lab_img.astype(np.uint8)
-# %%
-print(gen_lab_img[...,0].min(), '->', gen_lab_img[...,0].max())
-print(gen_lab_img[...,1].min(), '->', gen_lab_img[...,1].max())
-print(gen_lab_img[...,2].min(), '->', gen_lab_img[...,2].max())
 
-# %%
+# %% show test img
 gen_img = cv2.cvtColor(gen_lab_img, cv2.COLOR_LAB2BGR)
-plt.imshow(gen_img)
-plt.show()
 
-# %%
+plt.subplot(2, 2, 1)
+plt.title('Fake img')
+plt.imshow(gen_img)
+
+plt.subplot(2, 2, 2)
+plt.title('Real img')
 plt.imshow(cv2.resize(cv2.imread(test_img_path), (256, 256)))
+
 plt.show()
