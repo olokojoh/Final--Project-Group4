@@ -3,16 +3,16 @@ import cv2
 """## Load dataset"""
 
 import os
+import numpy as np
 
 DATA_DIR = os.getcwd()
 
-3%2
 
-data_path =  abspath + 'Flickr1024 Dataset'
+data_path =  '../Data'
 train_list = [f for f in os.listdir(data_path) if f[:-2] == "Train"]
 lab_img = []
 real_img = []
-RESIZE = (128, 128)
+RESIZE = (256, 256)
 for index1, path in enumerate(train_list):
   print("loading %s dataset:" % (path))
   for index2, image in enumerate([f for f in os.listdir(data_path+'/'+path)]):
@@ -25,35 +25,8 @@ for index1, path in enumerate(train_list):
       print("%d images loaded" %(index2))
   print('----------------------------')
 
-import numpy as np
-
-dim=np.vstack(([i.shape[0] for i in lab_img],[i.shape[1] for i in lab_img],[i.shape[2] for i in lab_img])).T
-# for i in range(10):
-#   print(x[i].shape)
-#   print(x[i].shape[0]*x[i].shape[1]*x[i].shape[2])
-#   print('---------------------------')
-print(dim[:,0].min(),'-',dim[:,0].max())
-print(dim[:,1].min(),'-',dim[:,1].max())
-print(dim[:,2].min(),'-',dim[:,2].max())
-
-"""The size range is (500-2700, 500-2100, 3)
-Back to above cell and resize to (100, 100)
-"""
-
-train_list
-
-from google.colab.patches import cv2_imshow
-img1 = lab_img[250]
-
-img1.shape
-
-cv2_imshow(img1[:,:,0])
-
-cv2_imshow((cv2.cvtColor(img1, cv2.COLOR_LAB2BGR)))
-
 """## DCGAN demo"""
 
-from __future__ import print_function
 #%matplotlib inline
 import argparse
 import os
@@ -63,14 +36,15 @@ import torch.nn as nn
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, Dataset, TensorDataset
 import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
+import torchvision.models as models
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from IPython.display import HTML
+from torch.autograd import Variable
 
 # Set random seed for reproducibility
 manualSeed = 999
@@ -85,7 +59,7 @@ dataroot = "/content/drive/My Drive/Colab Notebooks/ml2_final_project/Flickr1024
 # Number of workers for dataloader
 workers = 2
 # Batch size during training
-batch_size = 128
+batch_size = 2
 # Spatial size of training images. All images will be resized to this
 #   size using a transformer.
 image_size = 128
@@ -98,29 +72,31 @@ ngf = 64
 # Size of feature maps in discriminator
 ndf = 64
 # Number of training epochs
-num_epochs = 30
+num_epochs = 100
 # Learning rate for optimizers
-lr = 0.0002
+lr = 0.0001
 # Beta1 hyperparam for Adam optimizers
 beta1 = 0.5
 # Number of GPUs available. Use 0 for CPU mode.
 ngpu = 1
 
 gray_img = np.array([i[:,:,0] for i in lab_img])
+ab_img = np.array([i[:,:,1:] for i in lab_img])
+
 real_img = np.array(real_img)
 
-real_img.shape
 
-cv2_imshow(np.transpose(np.transpose(real_img[0], (2,0,1)), (1,2,0)))
+# print(l_range.min()/255*100,'->',l_range.max()/255*100)
+# print(a_range.min()-128,'->',a_range.max()-128)
+# print(b_range.min()-128,'->',b_range.max()-128)
 
-gray_img = gray_img.reshape(len(gray_img), 1, 128, 128)
+
+
+gray_img = gray_img.reshape(len(gray_img), 1, 256, 256)
+ab_img = np.transpose(ab_img, (0,3,1,2))
+
 real_img = np.transpose(real_img, (0,3,1,2))
 
-gray_img.shape
-
-real_img.shape
-
-cv2_imshow(np.transpose(real_img[0,:,:,:], (1,2,0)))
 
 # Create the dataloader
 gray_img_Tensor = TensorDataset(torch.Tensor(gray_img))
@@ -129,8 +105,40 @@ real_img_Tensor = TensorDataset(torch.Tensor(real_img))
 Gray_dataloader = DataLoader(gray_img_Tensor, batch_size=batch_size, shuffle=True, num_workers=workers)
 Real_dataloader = DataLoader(real_img_Tensor, batch_size=batch_size, shuffle=True, num_workers=workers)
 
+# Cite: https://stackoverflow.com/questions/55588201/pytorch-transforms-on-tensordataset
+class CustomTensorDataset(Dataset):
+    """TensorDataset with support of transforms.
+    """
+    def __init__(self, tensors, transform=None):
+        assert all(tensors[0].size(0) == tensor.size(0) for tensor in tensors)
+        self.tensors = tensors
+        self.transform = transform
+
+    def __getitem__(self, index):
+        x = self.tensors[0][index]
+
+        if self.transform:
+            x = self.transform((x))
+
+        y = self.tensors[1][index]
+
+        return x, y
+
+    def __len__(self):
+        return self.tensors[0].size(0)
+
+gray_img = gray_img/255
+ab_img = ab_img/255
+
+L_img_Tensor = torch.Tensor(gray_img) #L*
+ab_img_Tensor = torch.Tensor(ab_img) #a*, b*
+train_dataset = CustomTensorDataset(tensors=(L_img_Tensor, ab_img_Tensor))
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=workers)
+
 # Decide which device we want to run on
 device = torch.device("cuda:0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
+
+torch.Tensor(gray_img).shape
 
 # Plot some training images
 real_batch = next(iter(Gray_dataloader))
@@ -158,40 +166,166 @@ def weights_init(m):
         nn.init.constant_(m.bias.data, 0)
 
 # Generator Code
+from functools import reduce
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+class shave_block(nn.Module):
+    def __init__(self, s):
+        super(shave_block, self).__init__()
+        self.s=s
+    def forward(self,x):
+        return x[:,:,self.s:-self.s,self.s:-self.s]
+
+class LambdaBase(nn.Sequential):
+    def __init__(self, fn, *args):
+        super(LambdaBase, self).__init__(*args)
+        self.lambda_func = fn
+
+    def forward_prepare(self, input):
+        output = []
+        for module in self._modules.values():
+            output.append(module(input))
+        return output if output else input
+
+class Lambda(LambdaBase):
+    def forward(self, input):
+        return self.lambda_func(self.forward_prepare(input))
+
+class LambdaMap(LambdaBase):
+    def forward(self, input):
+        return list(map(self.lambda_func,self.forward_prepare(input)))
+
+class LambdaReduce(LambdaBase):
+    def forward(self, input):
+        return reduce(self.lambda_func,self.forward_prepare(input))
+
 
 class Generator(nn.Module):
     def __init__(self, ngpu):
         super(Generator, self).__init__()
         self.ngpu = ngpu
-        self.main = nn.Sequential(
-            # input is Z, going into a convolution
-            nn.ConvTranspose2d( nz, ngf * 16, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(ngf * 16),
-            nn.ReLU(True),
-            # state size. (ngf*16) x 4 x 4
-            nn.ConvTranspose2d(ngf * 16, ngf * 8, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 8),
-            nn.ReLU(True),
-            # state size. (ngf*8) x 8 x 8
-            nn.ConvTranspose2d( ngf * 8, ngf * 4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 4),
-            nn.ReLU(True),
-            # state size. (ngf*4) x 16 x 16
-            nn.ConvTranspose2d( ngf * 4, ngf * 2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 2),
-            nn.ReLU(True),
-            # state size. (ngf*2) x 32 x 32
-            nn.ConvTranspose2d( ngf * 2, ngf, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf),
-            nn.ReLU(True),
-            # state size. (ngf) x 64 x 64
-            nn.ConvTranspose2d( ngf, nc, 4, 2, 1, bias=False),
-            nn.Tanh()
-            # state size. (nc) x 128 x 128
+        self.main = nn.Sequential( # Sequential,
+            nn.ReflectionPad2d((40, 40, 40, 40)),
+            nn.Conv2d(1,32,(9, 9),(1, 1),(4, 4)),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.Conv2d(32,64,(3, 3),(2, 2),(1, 1)),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.Conv2d(64,128,(3, 3),(2, 2),(1, 1)),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.Sequential( # Sequential,
+                LambdaMap(lambda x: x, # ConcatTable,
+                    nn.Sequential( # Sequential,
+                        nn.Conv2d(128,128,(3, 3)),
+                        nn.BatchNorm2d(128),
+                        nn.ReLU(),
+                        nn.Conv2d(128,128,(3, 3)),
+                        nn.BatchNorm2d(128),
+                        ),
+                    shave_block(2),
+                    ),
+                LambdaReduce(lambda x,y: x+y), # CAddTable,
+                ),
+            nn.Sequential( # Sequential,
+                LambdaMap(lambda x: x, # ConcatTable,
+                    nn.Sequential( # Sequential,
+                        nn.Conv2d(128,128,(3, 3)),
+                        nn.BatchNorm2d(128),
+                        nn.ReLU(),
+                        nn.Conv2d(128,128,(3, 3)),
+                        nn.BatchNorm2d(128),
+                        ),
+                    shave_block(2),
+                    ),
+                LambdaReduce(lambda x,y: x+y), # CAddTable,
+                ),
+            nn.Sequential( # Sequential,
+                LambdaMap(lambda x: x, # ConcatTable,
+                    nn.Sequential( # Sequential,
+                        nn.Conv2d(128,128,(3, 3)),
+                        nn.BatchNorm2d(128),
+                        nn.ReLU(),
+                        nn.Conv2d(128,128,(3, 3)),
+                        nn.BatchNorm2d(128),
+                        ),
+                    shave_block(2),
+                    ),
+                LambdaReduce(lambda x,y: x+y), # CAddTable,
+                ),
+            nn.Sequential( # Sequential,
+                LambdaMap(lambda x: x, # ConcatTable,
+                    nn.Sequential( # Sequential,
+                        nn.Conv2d(128,128,(3, 3)),
+                        nn.BatchNorm2d(128),
+                        nn.ReLU(),
+                        nn.Conv2d(128,128,(3, 3)),
+                        nn.BatchNorm2d(128),
+                        ),
+                    shave_block(2),
+                    ),
+                LambdaReduce(lambda x,y: x+y), # CAddTable,
+                ),
+            nn.Sequential( # Sequential,
+                LambdaMap(lambda x: x, # ConcatTable,
+                    nn.Sequential( # Sequential,
+                        nn.Conv2d(128,128,(3, 3)),
+                        nn.BatchNorm2d(128),
+                        nn.ReLU(),
+                        nn.Conv2d(128,128,(3, 3)),
+                        nn.BatchNorm2d(128),
+                        ),
+                    shave_block(2),
+                    ),
+                LambdaReduce(lambda x,y: x+y), # CAddTable,
+                ),
+            nn.ConvTranspose2d(128,64,(3, 3),(2, 2),(1, 1),(1, 1)),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.ConvTranspose2d(64,32,(3, 3),(2, 2),(1, 1),(1, 1)),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.Conv2d(32,2,(9, 9),(1, 1),(4, 4)),
+            nn.Tanh(),
         )
 
     def forward(self, input):
         return self.main(input)
+
+# # Generator Code
+# class Generator(nn.Module):
+#     def __init__(self, ngpu):
+#         super(Generator, self).__init__()
+#         self.ngpu = ngpu
+#         self.main = nn.Sequential(
+#             # input is Z, going into a convolution
+#             nn.ConvTranspose2d( nz, ngf * 16, 4, 1, 0, bias=False),
+#             nn.BatchNorm2d(ngf * 16),
+#             nn.ReLU(True),
+#             # state size. (ngf*16) x 4 x 4
+#             nn.ConvTranspose2d(ngf * 16, ngf * 8, 4, 2, 1, bias=False),
+#             nn.BatchNorm2d(ngf * 8),
+#             nn.ReLU(True),
+#             # state size. (ngf*8) x 8 x 8
+#             nn.ConvTranspose2d( ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+#             nn.BatchNorm2d(ngf * 4),
+#             nn.ReLU(True),
+#             # state size. (ngf*4) x 16 x 16
+#             nn.ConvTranspose2d( ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+#             nn.BatchNorm2d(ngf * 2),
+#             nn.ReLU(True),
+#             # state size. (ngf*2) x 32 x 32
+#             nn.ConvTranspose2d( ngf * 2, ngf, 4, 2, 1, bias=False),
+#             nn.BatchNorm2d(ngf),
+#             nn.ReLU(True),
+#             # state size. (ngf) x 64 x 64
+#             nn.ConvTranspose2d( ngf, nc, 4, 2, 1, bias=False),
+#             nn.Tanh()
+#             # state size. (nc) x 128 x 128
+#         )
+
+#     def forward(self, input):
+#         return self.main(input)
 
 # Create the generator
 netG = Generator(ngpu).to(device)
@@ -202,13 +336,12 @@ if (device.type == 'cuda') and (ngpu > 1):
 
 # Apply the weights_init function to randomly initialize all weights
 #  to mean=0, stdev=0.2.
-netG.apply(weights_init)
+# netG.apply(weights_init)
 
 # Print the model
-print(netG)
+# print(netG)
 
 # Discriminator Code
-
 class Discriminator(nn.Module):
     def __init__(self, ngpu):
         super(Discriminator, self).__init__()
@@ -242,7 +375,12 @@ class Discriminator(nn.Module):
         return self.main(input)
 
 # Create the Discriminator
-netD = Discriminator(ngpu).to(device)
+# netD = Discriminator(ngpu).to(device)
+
+# Try pretrained model here
+netD = models.resnet18(pretrained=False, num_classes=2)
+netD.fc = nn.Sequential(nn.Linear(512, 1), nn.Sigmoid())
+netD = netD.to(device)
 
 # Handle multi-gpu if desired
 if (device.type == 'cuda') and (ngpu > 1):
@@ -250,10 +388,13 @@ if (device.type == 'cuda') and (ngpu > 1):
     
 # Apply the weights_init function to randomly initialize all weights
 #  to mean=0, stdev=0.2.
-netD.apply(weights_init)
+# netD.apply(weights_init)
 
 # Print the model
-print(netD)
+# print(netD)
+
+def save_weights(to_save_dict, epoch):
+    torch.save(to_save_dict, 'colorize_gan_{}.pth.tar'.format(epoch))
 
 # Loss Functions and Optimizers
 # Initialize BCELoss function
@@ -271,113 +412,51 @@ fake_label = 0.
 optimizerD = optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
 optimizerG = optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
 
-netD
+# Try RMSprop optimizers for both G and D
+# optimizerD = optim.RMSprop(netD.parameters(), lr=lr, alpha=0.99)
+# optimizerG = optim.RMSprop(netG.parameters(), lr=lr, alpha=0.99)
 
+pixel_loss_weights = 1000
+g_every = 1 # every number of imgs to update parameters
+
+# %%
 # Commented out IPython magic to ensure Python compatibility.
-# Training Loop
+for epoch in range(num_epochs):
+    for i, (y, uv) in enumerate(train_dataloader):
+      # Adversarial ground truths
+      valid = Variable(torch.Tensor(y.size(0), 1).fill_(1.0),
+                      requires_grad=False).to(device)
+      fake = Variable(torch.Tensor(y.size(0), 1).fill_(0.0),
+                      requires_grad=False).to(device)
 
-# Lists to keep track of progress
-img_list = []
-G_losses = []
-D_losses = []
-iters = 0
+      yvar = Variable(y).to(device)
+      uvvar = Variable(uv).to(device)
+      real_imgs = torch.cat([yvar, uvvar], dim=1)
+      print(yvar.shape)
+      break
+      optimizerG.zero_grad()
+      uvgen = netG(yvar)
+      # Generate a batch of images
+      gen_imgs = torch.cat([yvar.detach(), uvgen], dim=1)
 
-print("Starting Training Loop...")
-# For each epoch
-for epoch in range(1):
-    # For each batch in the dataloader
-    for i, data in enumerate(Real_dataloader, 0):
-        
-        ############################
-        # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-        ###########################
-        ## Train with all-real batch
-        netD.zero_grad()
-        # Format batch
-        real_cpu = data[0].to(device)
-        b_size = real_cpu.size(0)
-        label = torch.full((b_size,), real_label, dtype=torch.float, device=device)
-        # Forward pass real batch through D
-        output = netD(real_cpu).view(-1)
-        # Calculate loss on all-real batch
-        errD_real = criterion(output, label)
-        # Calculate gradients for D in backward pass
-        errD_real.backward()
-        D_x = output.mean().item()
+      # Loss measures generator's ability to fool the discriminator
+      g_loss_gan = criterion(netD(gen_imgs), valid)
+      g_loss = g_loss_gan + pixel_loss_weights * torch.mean((uvvar - uvgen)**2)
 
-        ## Train with all-fake batch
-        # Generate batch of latent vectors
-        noise = torch.randn(b_size, nz, 1, 1, device=device)
-        # Generate fake image batch with G
-        fake = netG(noise)
-        label.fill_(fake_label)
-        # Classify all fake batch with D
-        output = netD(fake.detach()).view(-1)
-        # Calculate D's loss on the all-fake batch
-        errD_fake = criterion(output, label)
-        # Calculate the gradients for this batch
-        errD_fake.backward()
-        D_G_z1 = output.mean().item()
-        # Add the gradients from the all-real and all-fake batches
-        errD = errD_real + errD_fake
-        # Update D
-        optimizerD.step()
-
-        ############################
-        # (2) Update G network: maximize log(D(G(z)))
-        ###########################
-        netG.zero_grad()
-        label.fill_(real_label)  # fake labels are real for generator cost
-        # Since we just updated D, perform another forward pass of all-fake batch through D
-        output = netD(fake).view(-1)
-        # Calculate G's loss based on this output
-        errG = criterion(output, label)
-        # Calculate gradients for G
-        errG.backward()
-        D_G_z2 = output.mean().item()
-        # Update G
+      if i % g_every == 0:
+        g_loss.backward()
         optimizerG.step()
+
+      optimizerD.zero_grad()
+      # Measure discriminator's ability to classify real from generated samples
+      real_loss = criterion(netD(real_imgs), valid)
+      fake_loss = criterion(netD(gen_imgs.detach()), fake)
+      d_loss = (real_loss + fake_loss) / 2
+      d_loss.backward()
+      optimizerD.step()
+      if i % 100 == 0:
+        print("Epoch: %d, iter: %d, [D loss: %f] [G total loss: %f] [G GAN Loss: %f]" 
+              % (epoch, i, d_loss.item(), g_loss.item(), g_loss_gan.item()))
         
-        # Output training stats
-        if i % 50 == 0:
-            print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
-#                   % (epoch, num_epochs, i, len(Real_dataloader),
-                     errD.item(), errG.item(), D_x, D_G_z1, D_G_z2))
-        
-        # Save Losses for plotting later
-        G_losses.append(errG.item())
-        D_losses.append(errD.item())
-        
-        # Check how the generator is doing by saving G's output on fixed_noise
-        if (iters % 500 == 0) or ((epoch == num_epochs-1) and (i == len(Real_dataloader)-1)):
-            with torch.no_grad():
-                fake = netG(fixed_noise).detach().cpu()
-            img_list.append(vutils.make_grid(fake, padding=2, normalize=True))
-            
-        iters += 1
+        save_weights({'D': netD.state_dict(), 'G': netG.state_dict(), 'epoch': epoch}, epoch)
 
-# Below is a plot of D & G’s losses versus training iterations.
-# 
-
-plt.figure(figsize=(10,5))
-plt.title("Generator and Discriminator Loss During Training")
-plt.plot(G_losses,label="G")
-plt.plot(D_losses,label="D")
-plt.xlabel("iterations")
-plt.ylabel("Loss")
-plt.legend()
-plt.show()
-
-#%%capture
-fig = plt.figure(figsize=(8,8))
-plt.axis("off")
-ims = [[plt.imshow(np.transpose(i,(1,2,0)), animated=True)] for i in img_list]
-ani = animation.ArtistAnimation(fig, ims, interval=1000, repeat_delay=1000, blit=True)
-
-HTML(ani.to_jshtml())
-
-"""# -  Check out some other cool GAN projects here
-#    `<https://github.com/nashory/gans-awesome-applications>`__
-# -  Create GANs that generate music
-#    `<https://deepmind.com/blog/wavenet-generative-model-raw-audio/>`__
-"""
