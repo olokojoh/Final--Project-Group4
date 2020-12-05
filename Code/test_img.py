@@ -212,3 +212,22 @@ def draw_colorized_image(test_img_floder, number_of_img_shown, epoch, save_path,
 # %%
 draw_colorized_image('../Data/Test', 2, 300, 'example1')
 
+# %%
+from torchviz import make_dot, make_dot_from_trace
+from graphviz import Source
+
+gpu = 0
+device = torch.device("cpu")
+model = 'colorize_gan_{}.pth.tar'.format(epoch - 1)
+G = Generator(gpu).to(device)
+G.load_state_dict(torch.load(model, map_location={'cuda:0': 'cpu'})['G'])
+test_img_path = data_path + '/Test/001_L.png'
+test_img = cv2.resize(cv2.imread(test_img_path), (256, 256))
+test_img_lab = cv2.cvtColor(test_img, cv2.COLOR_BGR2LAB)
+test_img_lab_scaled = test_img_lab / 255
+test_img_L = test_img_lab_scaled[..., 0].reshape(1, 1, 256, 256)
+img_variable = Variable(torch.Tensor(test_img_L))
+
+ab_gen = G(img_variable)
+model_arch = make_dot(G(img_variable), params=dict(G.named_parameters()))
+Source(model_arch).render('structure')
