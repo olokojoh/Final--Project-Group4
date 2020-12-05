@@ -25,11 +25,7 @@ for index1, path in enumerate(train_list):
       print("%d images loaded" %(index2))
   print('----------------------------')
 
-"""## DCGAN demo"""
-
 #%matplotlib inline
-import argparse
-import os
 import random
 import torch
 import torch.nn as nn
@@ -37,13 +33,10 @@ import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset, TensorDataset
-import torchvision.datasets as dset
-import torchvision.transforms as transforms
 import torchvision.utils as vutils
 import torchvision.models as models
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 from torch.autograd import Variable
 
 # Set random seed for reproducibility
@@ -53,9 +46,6 @@ print("Random Seed: ", manualSeed)
 random.seed(manualSeed)
 torch.manual_seed(manualSeed)
 
-# Root directory for dataset
-dataroot = "/content/drive/My Drive/Colab Notebooks/ml2_final_project/Flickr1024 Dataset/"
-# dataroot = os.listdir('/content/drive/My Drive/Colab Notebooks/ml2_final_project/Flickr1024 Dataset/Train_4')
 # Number of workers for dataloader
 workers = 2
 # Batch size during training
@@ -72,7 +62,7 @@ ngf = 64
 # Size of feature maps in discriminator
 ndf = 64
 # Number of training epochs
-num_epochs = 100
+num_epochs = 300
 # Learning rate for optimizers
 lr = 0.0001
 # Beta1 hyperparam for Adam optimizers
@@ -292,41 +282,6 @@ class Generator(nn.Module):
     def forward(self, input):
         return self.main(input)
 
-# # Generator Code
-# class Generator(nn.Module):
-#     def __init__(self, ngpu):
-#         super(Generator, self).__init__()
-#         self.ngpu = ngpu
-#         self.main = nn.Sequential(
-#             # input is Z, going into a convolution
-#             nn.ConvTranspose2d( nz, ngf * 16, 4, 1, 0, bias=False),
-#             nn.BatchNorm2d(ngf * 16),
-#             nn.ReLU(True),
-#             # state size. (ngf*16) x 4 x 4
-#             nn.ConvTranspose2d(ngf * 16, ngf * 8, 4, 2, 1, bias=False),
-#             nn.BatchNorm2d(ngf * 8),
-#             nn.ReLU(True),
-#             # state size. (ngf*8) x 8 x 8
-#             nn.ConvTranspose2d( ngf * 8, ngf * 4, 4, 2, 1, bias=False),
-#             nn.BatchNorm2d(ngf * 4),
-#             nn.ReLU(True),
-#             # state size. (ngf*4) x 16 x 16
-#             nn.ConvTranspose2d( ngf * 4, ngf * 2, 4, 2, 1, bias=False),
-#             nn.BatchNorm2d(ngf * 2),
-#             nn.ReLU(True),
-#             # state size. (ngf*2) x 32 x 32
-#             nn.ConvTranspose2d( ngf * 2, ngf, 4, 2, 1, bias=False),
-#             nn.BatchNorm2d(ngf),
-#             nn.ReLU(True),
-#             # state size. (ngf) x 64 x 64
-#             nn.ConvTranspose2d( ngf, nc, 4, 2, 1, bias=False),
-#             nn.Tanh()
-#             # state size. (nc) x 128 x 128
-#         )
-
-#     def forward(self, input):
-#         return self.main(input)
-
 # Create the generator
 netG = Generator(ngpu).to(device)
 
@@ -422,26 +377,26 @@ g_every = 1 # every number of imgs to update parameters
 # %%
 # Commented out IPython magic to ensure Python compatibility.
 for epoch in range(num_epochs):
-    for i, (y, uv) in enumerate(train_dataloader):
+    for i, (l, ab) in enumerate(train_dataloader):
       # Adversarial ground truths
-      valid = Variable(torch.Tensor(y.size(0), 1).fill_(1.0),
+      valid = Variable(torch.Tensor(l.size(0), 1).fill_(1.0),
                       requires_grad=False).to(device)
-      fake = Variable(torch.Tensor(y.size(0), 1).fill_(0.0),
+      fake = Variable(torch.Tensor(l.size(0), 1).fill_(0.0),
                       requires_grad=False).to(device)
 
-      yvar = Variable(y).to(device)
-      uvvar = Variable(uv).to(device)
-      real_imgs = torch.cat([yvar, uvvar], dim=1)
-      print(yvar.shape)
-      break
+      lvar = Variable(l).to(device)
+      abvar = Variable(ab).to(device)
+      real_imgs = torch.cat([lvar, abvar], dim=1)
+      # print(lvar.shape)
+      # break
       optimizerG.zero_grad()
-      uvgen = netG(yvar)
+      abgen = netG(lvar)
       # Generate a batch of images
-      gen_imgs = torch.cat([yvar.detach(), uvgen], dim=1)
+      gen_imgs = torch.cat([lvar.detach(), abgen], dim=1)
 
       # Loss measures generator's ability to fool the discriminator
       g_loss_gan = criterion(netD(gen_imgs), valid)
-      g_loss = g_loss_gan + pixel_loss_weights * torch.mean((uvvar - uvgen)**2)
+      g_loss = g_loss_gan + pixel_loss_weights * torch.mean((abvar - abgen)**2)
 
       if i % g_every == 0:
         g_loss.backward()

@@ -150,39 +150,72 @@ class Generator(nn.Module):
 
     def forward(self, input):
         return self.main(input)
+# %%
+# test_img_floder = '../Data/customize_test'
+# test_img_path = [img_path for img_path in os.listdir(test_img_floder)]
+# print(test_img_path)
+# %%
+def draw_colorized_image(test_img_floder, number_of_img_shown, origial_size=False):
+    gpu = 0
+    device = torch.device("cpu")
+    model = 'colorize_gan_99.pth.tar'
+    G = Generator(gpu).to(device)
+    G.load_state_dict(torch.load(model,map_location={'cuda:0': 'cpu'})['G'])
+
+    # test_img_path = '../Data/Test/001_L.png'
+    test_img_path = [test_img_floder+'/'+img_path for img_path in os.listdir(test_img_floder)]
+
+    for row, img_path in enumerate(test_img_path):
+        print(img_path)
+        img = cv2.imread(img_path)
+        size = (img.shape[1], img.shape[0])
+        test_img = cv2.resize(img, (256, 256))
+        test_img_lab = cv2.cvtColor(test_img, cv2.COLOR_BGR2LAB)
+        test_img_lab_scaled = test_img_lab/255
+        test_img_L = test_img_lab_scaled[..., 0].reshape(1, 1,256,256)
+        img_variable = Variable(torch.Tensor(test_img_L))
+
+        ab_gen = G(img_variable)
+        ab = ab_gen.cpu().detach().numpy()
+        ab = ab*255
+
+        gen_lab_img = np.transpose(np.vstack((test_img_L[0,...]*255, ab[0,...])), (1, 2, 0))
+        gen_lab_img = gen_lab_img.astype(np.uint8)
+
+        # show test img
+        gen_img = cv2.cvtColor(gen_lab_img, cv2.COLOR_LAB2RGB) # for plt show use RGB channel not BGR
+
+        idx = row*3
+
+        if origial_size:
+            plt.subplot(number_of_img_shown, 3, (idx+1))
+            plt.title('Gray img')
+            plt.imshow(cv2.resize(test_img_lab[..., 0], size), cmap='gray')
+
+            plt.subplot(number_of_img_shown, 3, (idx+2))
+            plt.title('Real img')
+            plt.imshow(cv2.resize(cv2.cvtColor(test_img, cv2.COLOR_BGR2RGB), size))
+
+            plt.subplot(number_of_img_shown, 3, (idx+3))
+            plt.title('Fake img')
+            plt.imshow(cv2.resize(gen_img, size))
+        else:
+            plt.subplot(number_of_img_shown, 3, (idx+1))
+            plt.title('Gray img')
+            plt.imshow(test_img_lab[..., 0], cmap='gray')
+
+            plt.subplot(number_of_img_shown, 3, (idx+2))
+            plt.title('Real img')
+            plt.imshow(cv2.cvtColor(test_img, cv2.COLOR_BGR2RGB))
+
+            plt.subplot(number_of_img_shown, 3, (idx+3))
+            plt.title('Fake img')
+            plt.imshow(gen_img)
+
+        if row+2 > number_of_img_shown:
+            break
+
+    plt.show()
 
 # %%
-gpu = 0
-device = torch.device("cpu")
-model = 'colorize_gan_99.pth.tar'
-
-G = Generator(gpu).to(device)
-
-G.load_state_dict(torch.load(model,map_location={'cuda:0': 'cpu'})['G'])
-
-# %%
-test_img_path = '../Data/Test/003_L.png'
-test_img = cv2.cvtColor(cv2.resize(cv2.imread(test_img_path), (256, 256)), cv2.COLOR_BGR2LAB)/255
-test_img_L = test_img[..., 0].reshape(1, 1,256,256)
-img_variable = Variable(torch.Tensor(test_img_L))
-
-ab_gen = G(img_variable)
-ab = ab_gen.cpu().detach().numpy()
-ab = ab*255
-
-# %%
-gen_lab_img = np.transpose(np.vstack((test_img_L[0,...]*255, ab[0,...])), (1, 2, 0))
-gen_lab_img = gen_lab_img.astype(np.uint8)
-
-# %% show test img
-gen_img = cv2.cvtColor(gen_lab_img, cv2.COLOR_LAB2BGR)
-
-plt.subplot(2, 2, 1)
-plt.title('Fake img')
-plt.imshow(gen_img)
-
-plt.subplot(2, 2, 2)
-plt.title('Real img')
-plt.imshow(cv2.resize(cv2.imread(test_img_path), (256, 256)))
-
-plt.show()
+draw_colorized_image('../Data/Test', 1)
