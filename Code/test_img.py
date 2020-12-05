@@ -2,27 +2,14 @@
 Simple demo for colorization a gray scaled image
 
 """
-import torch
-from torch.autograd import Variable
-from scipy.ndimage import zoom
 import cv2
 import os
-from PIL import Image
-import numpy as np
-import random
 import torch
+from random import sample
 import torch.nn as nn
 import torch.nn.parallel
-import torch.backends.cudnn as cudnn
-import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset, TensorDataset
-import torchvision.datasets as dset
-import torchvision.transforms as transforms
-import torchvision.utils as vutils
-import torchvision.models as models
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 from torch.autograd import Variable
 from functools import reduce
 
@@ -155,15 +142,19 @@ class Generator(nn.Module):
 # test_img_path = [img_path for img_path in os.listdir(test_img_floder)]
 # print(test_img_path)
 # %%
-def draw_colorized_image(test_img_floder, number_of_img_shown, origial_size=False):
+def draw_colorized_image(test_img_floder, number_of_img_shown, epoch, save_path, origial_size=False, random_img=False):
     gpu = 0
     device = torch.device("cpu")
-    model = 'colorize_gan_99.pth.tar'
+    model = 'colorize_gan_{}.pth.tar'.format(epoch-1)
     G = Generator(gpu).to(device)
     G.load_state_dict(torch.load(model,map_location={'cuda:0': 'cpu'})['G'])
 
     # test_img_path = '../Data/Test/001_L.png'
-    test_img_path = [test_img_floder+'/'+img_path for img_path in os.listdir(test_img_floder)]
+    if not random_img:
+        test_img_path = [test_img_floder+'/'+img_path for img_path in os.listdir(test_img_floder)]
+    else:
+        test_img_path = sample([test_img_floder+'/'+img_path for img_path in os.listdir(test_img_floder)], number_of_img_shown)
+
 
     for row, img_path in enumerate(test_img_path):
         print(img_path)
@@ -215,7 +206,9 @@ def draw_colorized_image(test_img_floder, number_of_img_shown, origial_size=Fals
         if row+2 > number_of_img_shown:
             break
 
+    plt.savefig(save_path + '_'+ str(epoch) + 'epochs' + '.png')
     plt.show()
 
 # %%
-draw_colorized_image('../Data/Test', 1)
+draw_colorized_image('../Data/Test', 2, 300, 'example1')
+
