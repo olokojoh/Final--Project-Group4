@@ -49,7 +49,7 @@ torch.manual_seed(manualSeed)
 # Number of workers for dataloader
 workers = 2
 # Batch size during training
-batch_size = 2
+batch_size = 32
 # Spatial size of training images. All images will be resized to this
 #   size using a transformer.
 image_size = 128
@@ -62,7 +62,7 @@ ngf = 64
 # Size of feature maps in discriminator
 ndf = 64
 # Number of training epochs
-num_epochs = 300
+num_epochs = 100
 # Learning rate for optimizers
 lr = 0.0001
 # Beta1 hyperparam for Adam optimizers
@@ -302,27 +302,32 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         self.ngpu = ngpu
         self.main = nn.Sequential(
-            # input is (nc) x 128 x 128
+            # input is (nc) x 256 x 256
             nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf),
+            nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ndf) x 128 x 128
+            nn.Conv2d(ndf, ndf*2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf*2),
             nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf) x 64 x 64
-            nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ndf * 2),
-            nn.LeakyReLU(0.2, inplace=True),
-            # state size. (ndf*2) x 16 x 16
-            nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
+            nn.Conv2d(ndf*2, ndf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 4),
             nn.LeakyReLU(0.2, inplace=True),
-            # state size. (ndf*4) x 8 x 8
+            # state size. (ndf*2) x 16 x 16
             nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 8),
             nn.LeakyReLU(0.2, inplace=True),
-            # state size. (ndf*8) x 4 x 4
+            # state size. (ndf*4) x 8 x 8
             nn.Conv2d(ndf * 8, ndf * 16, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 16),
             nn.LeakyReLU(0.2, inplace=True),
+            # state size. (ndf*8) x 4 x 4
+            nn.Conv2d(ndf * 16, ndf * 32, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 32),
+            nn.LeakyReLU(0.2, inplace=True),
             # state size. (ndf*8) x 1 x 1
-            nn.Conv2d(ndf * 16, 1, 4, 1, 0, bias=False),
+            nn.Conv2d(ndf * 32, 1, 4, 1, 0, bias=False),
             nn.Sigmoid()
         )
 
@@ -330,12 +335,12 @@ class Discriminator(nn.Module):
         return self.main(input)
 
 # Create the Discriminator
-# netD = Discriminator(ngpu).to(device)
+netD = Discriminator(ngpu).to(device)
 
 # Try pretrained model here
-netD = models.resnet18(pretrained=False, num_classes=2)
-netD.fc = nn.Sequential(nn.Linear(512, 1), nn.Sigmoid())
-netD = netD.to(device)
+# netD = models.resnet18(pretrained=False, num_classes=2)
+# netD.fc = nn.Sequential(nn.Linear(512, 1), nn.Sigmoid())
+# netD = netD.to(device)
 
 # Handle multi-gpu if desired
 if (device.type == 'cuda') and (ngpu > 1):
@@ -374,15 +379,29 @@ optimizerG = optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
 pixel_loss_weights = 1000
 g_every = 1 # every number of imgs to update parameters
 
+plt_g_loss = []
+plt_d_loss = []
 # %%
 # Commented out IPython magic to ensure Python compatibility.
 for epoch in range(num_epochs):
     for i, (l, ab) in enumerate(train_dataloader):
       # Adversarial ground truths
-      valid = Variable(torch.Tensor(l.size(0), 1).fill_(1.0),
+      # valid = Variable(torch.Tensor(l.size(0), 1).fill_(1.0),
+      #                 requires_grad=False).to(device)
+      # fake = Variable(torch.Tensor(l.size(0), 1).fill_(0.0),
+      #                 requires_grad=False).to(device)
+
+      # Apply Soft and noisy label
+      valid = Variable(torch.Tensor(l.size(0), 1).fill_(random.uniform(0.9,1)),
                       requires_grad=False).to(device)
-      fake = Variable(torch.Tensor(l.size(0), 1).fill_(0.0),
+      fake = Variable(torch.Tensor(l.size(0), 1).fill_(random.uniform(0,0.1)),
                       requires_grad=False).to(device)
+
+      # Apply Exchanged label
+      # fake = Variable(torch.Tensor(l.size(0), 1).fill_(1.0),
+      #                 requires_grad=False).to(device)
+      # valid = Variable(torch.Tensor(l.size(0), 1).fill_(0.0),
+      #                 requires_grad=False).to(device)
 
       lvar = Variable(l).to(device)
       abvar = Variable(ab).to(device)
@@ -397,6 +416,7 @@ for epoch in range(num_epochs):
       # Loss measures generator's ability to fool the discriminator
       g_loss_gan = criterion(netD(gen_imgs), valid)
       g_loss = g_loss_gan + pixel_loss_weights * torch.mean((abvar - abgen)**2)
+      plt_g_loss.append(g_loss)
 
       if i % g_every == 0:
         g_loss.backward()
@@ -407,11 +427,36 @@ for epoch in range(num_epochs):
       real_loss = criterion(netD(real_imgs), valid)
       fake_loss = criterion(netD(gen_imgs.detach()), fake)
       d_loss = (real_loss + fake_loss) / 2
+      plt_d_loss.append(d_loss)
       d_loss.backward()
       optimizerD.step()
       if i % 100 == 0:
         print("Epoch: %d, iter: %d, [D loss: %f] [G total loss: %f] [G GAN Loss: %f]" 
               % (epoch, i, d_loss.item(), g_loss.item(), g_loss_gan.item()))
-        
+
         save_weights({'D': netD.state_dict(), 'G': netG.state_dict(), 'epoch': epoch}, epoch)
 
+# %% # Plot loss function
+fig, ax = plt.subplots()
+
+plt.xlabel('iterations')
+plt.ylabel('loss')
+
+"""set interval for y label"""
+yticks = range(0, int(max(plt_g_loss)+10), 50)
+ax.set_yticks(yticks)
+
+"""set min and max value for axes"""
+ax.set_ylim([-10, int(max(plt_g_loss)+10)])
+ax.set_xlim([0, 100])
+
+x = [i+1 for i in range(5000)]
+plt.plot(x, plt_g_loss, label="generator loss")
+plt.plot(x, plt_d_loss, label="discriminator loss")
+
+"""open the grid"""
+plt.grid(True)
+
+plt.legend(bbox_to_anchor=(1.0, 1), loc=1, borderaxespad=0.)
+
+plt.show()

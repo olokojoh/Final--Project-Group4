@@ -210,7 +210,7 @@ def draw_colorized_image(test_img_floder, number_of_img_shown, epoch, save_path,
     plt.show()
 
 # %%
-draw_colorized_image('../Data/Test', 2, 300, 'example1')
+draw_colorized_image('../Data/Test', 2, 100, 'example1')
 
 # %%
 from torchviz import make_dot, make_dot_from_trace
