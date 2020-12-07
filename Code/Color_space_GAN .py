@@ -457,6 +457,6 @@ plt.plot(x, plt_d_loss, label="discriminator loss")
 """open the grid"""
 plt.grid(True)
 
-plt.legend(bbox_to_anchor=(1.0, 1), loc=1, borderaxespad=0.)
+plt.legend(bbox_to_anchor=(1.0, 1), loc=1, borderaxespad=0)
 
 plt.show()

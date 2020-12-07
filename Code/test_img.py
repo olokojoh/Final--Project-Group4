@@ -142,15 +142,15 @@ class Generator(nn.Module):
 # test_img_path = [img_path for img_path in os.listdir(test_img_floder)]
 # print(test_img_path)
 # %%
-def draw_colorized_image(test_img_floder, number_of_img_shown, epoch, save_path, origial_size=False, random_img=False):
+def draw_colorized_image(test_img_floder, number_of_img_shown, epoch, save_path, original_size=False, random_img=False):
     """
     Input:
 
-    test_img_floder -> The folder where the images in
+    test_img_folder -> The folder where the images in
     number_of_img_shown -> Show number of images
     epoch -> Use which epoch of model
     save_path -> file of save figure
-    origial_size=False -> Whether resize to origial size
+    original_size=False -> Whether resize to original size
     random_img=False -> Whether random show images
     """
 
@@ -167,6 +167,7 @@ def draw_colorized_image(test_img_floder, number_of_img_shown, epoch, save_path,
     G.load_state_dict(torch.load(model,map_location={'cuda:0': 'cpu'})['G'])
 
     # test_img_path = '../Data/Test/001_L.png'
+
     if not random_img:
         test_img_path = [test_img_floder+'/'+img_path for img_path in os.listdir(test_img_floder)]
     else:
@@ -195,7 +196,7 @@ def draw_colorized_image(test_img_floder, number_of_img_shown, epoch, save_path,
 
         idx = row*3
 
-        if origial_size:
+        if original_size:
             plt.subplot(number_of_img_shown, 3, (idx+1))
             plt.title('Gray img')
             plt.imshow(cv2.resize(test_img_lab[..., 0], size), cmap='gray')
@@ -227,7 +228,46 @@ def draw_colorized_image(test_img_floder, number_of_img_shown, epoch, save_path,
     plt.show()
 
 # %%
-draw_colorized_image('../Data/Test', 2, 100, 'example1')
+draw_colorized_image('../Data/customize_test', 4, 100, 'example1')
+
+# %% test for single image
+gpu = 0
+device = torch.device("cpu")
+model = 'colorize_gan_{}.pth.tar'.format(500)
+G = Generator(gpu).to(device)
+G.load_state_dict(torch.load(model, map_location={'cuda:0': 'cpu'})['G'])
+
+img_path = '../Data/customize_test/romanhed.jpg'
+img = cv2.imread(img_path)
+size = (img.shape[1], img.shape[0])
+test_img = cv2.resize(img, (256, 256))
+test_img_lab = cv2.cvtColor(test_img, cv2.COLOR_BGR2LAB)
+test_img_lab_scaled = test_img_lab / 255
+test_img_L = test_img_lab_scaled[..., 0].reshape(1, 1, 256, 256)
+img_variable = Variable(torch.Tensor(test_img_L))
+
+ab_gen = G(img_variable)
+ab = ab_gen.cpu().detach().numpy()
+ab = ab * 255
+
+gen_lab_img = np.transpose(np.vstack((test_img_L[0, ...] * 255, ab[0, ...])), (1, 2, 0))
+gen_lab_img = gen_lab_img.astype(np.uint8)
+
+# show test img
+gen_img = cv2.cvtColor(gen_lab_img, cv2.COLOR_LAB2RGB)  # for plt show use RGB channel not BGR
+
+plt.subplot(1, 3, 1)
+plt.title('Gray img')
+plt.imshow(cv2.resize(test_img_lab[..., 0], size), cmap='gray')
+
+plt.subplot(1, 3, 2)
+plt.title('Real img')
+plt.imshow(cv2.resize(cv2.cvtColor(test_img, cv2.COLOR_BGR2RGB), size))
+
+plt.subplot(1, 3, 3)
+plt.title('Fake img')
+plt.imshow(cv2.resize(gen_img, size))
+plt.show()
 
 # %% Print out the structure of Generator
 from torchviz import make_dot, make_dot_from_trace
