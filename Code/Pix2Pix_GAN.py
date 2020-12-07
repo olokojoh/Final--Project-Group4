@@ -49,7 +49,8 @@ checkpoint_interval = 338
 
 warnings.filterwarnings('ignore')
 DATA_DIR = os.getcwd()
-data_path =  '../Data'
+data_path =  '../Data/Train_2'#try to train Train_2 at first in this case, but actually, the result showed in the report was the result from all data set.
+#train_list = [f for f in os.listdir(data_path) if f[:-2] == "Train"]
 
 #In this class, root is the path of the file.
 class ImageDataset_color(Dataset):
