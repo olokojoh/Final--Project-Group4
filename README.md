@@ -12,3 +12,6 @@ The aim of the project is helping balck and white pictures to get colors. By usi
 **Final-Group-Presentation**: PowerPoint of the presentation.
 
 **Code**: The source code of the project.
+
+## Preview
+![300 epochs](./Code/example1_300epochs.png)
