@@ -166,7 +166,7 @@ def draw_colorized_image(test_img_floder, number_of_img_shown, epoch, save_path,
     G = Generator(gpu).to(device)
     G.load_state_dict(torch.load(model,map_location={'cuda:0': 'cpu'})['G'])
 
-    # test_img_path = '../Data/Test/001_L.png'
+    # test_img_path = '../Data/Test/002_L.png'
 
     if not random_img:
         test_img_path = [test_img_floder+'/'+img_path for img_path in os.listdir(test_img_floder)]
