@@ -265,3 +265,8 @@ for epoch in range(0,n_epochs):
   torch.save(generator.state_dict(),DATA_DIR+"/generator_%d.pth"%epoch)
   print("generator_%d.pth"%epoch + "saved")
   torch.save(discriminator.state_dict(),DATA_DIR+"/discriminator_%d.pth"%epoch)
+    
+    
+plt.plot(loss_G_plot)
+plt.plot(loss_D_plot,color="red")
+plt.show()
