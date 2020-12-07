@@ -271,30 +271,3 @@ for epoch in range(0,n_epochs):
   print("generator_%d.pth"%epoch + "saved")
   torch.save(discriminator.state_dict(),DATA_DIR+"/discriminator_%d.pth"%epoch)
 
-plt.plot(loss_G_plot)
-plt.plot(loss_D_plot,color="red")
-plt.show()
-
-gpu = 0
-device = torch.device("cpu")
-model = 'colorize_gan_{}.pth.tar'.format(epoch - 1)
-generator = GeneratorUNet()
-generator = generator.cuda()
-generator.load_state_dict(torch.load(DATA_DIR+"/generator_99.pth"))
-#G = GeneratorUNet(gpu).to(device)
-#generator.load_state_dict(torch.load(model, map_location={'cuda:0': 'cpu'})['G'])
-
-test_path="/content/test"
-dataloader_test=DataLoader(ImageDataset_color(test_path,transforms_=transforms_),batch_size=1,num_workers=4,)
-#for epoch in range(epoch,n_epochs):
-for i, batch in enumerate(dataloader_test):
-  real_A = Variable(batch["B"].type(Tensor))
-  fake_B = generator(real_A)
-
-fake_B -=fake_B.min()
-fake_B/=fake_B.max()
-B=np.transpose(fake_B.cpu().detach().numpy(), (0,2,3,1))
-
-#from google.colab.patches import cv2_imshow
-plt.imshow(cv2.resize(B[0,...],(2220,1248)))
-
