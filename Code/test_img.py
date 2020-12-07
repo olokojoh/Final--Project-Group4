@@ -143,6 +143,23 @@ class Generator(nn.Module):
 # print(test_img_path)
 # %%
 def draw_colorized_image(test_img_floder, number_of_img_shown, epoch, save_path, origial_size=False, random_img=False):
+    """
+    Input:
+
+    test_img_floder -> The folder where the images in
+    number_of_img_shown -> Show number of images
+    epoch -> Use which epoch of model
+    save_path -> file of save figure
+    origial_size=False -> Whether resize to origial size
+    random_img=False -> Whether random show images
+    """
+
+    """
+    Output:
+
+    Print out the figures contains grayscale, real image and colorized image
+    Save the figure to the save_path
+    """
     gpu = 0
     device = torch.device("cpu")
     model = 'colorize_gan_{}.pth.tar'.format(epoch-1)
@@ -212,7 +229,7 @@ def draw_colorized_image(test_img_floder, number_of_img_shown, epoch, save_path,
 # %%
 draw_colorized_image('../Data/Test', 2, 100, 'example1')
 
-# %%
+# %% Print out the structure of Generator
 from torchviz import make_dot, make_dot_from_trace
 from graphviz import Source
 
