@@ -237,7 +237,8 @@ model = 'colorize_gan_{}.pth.tar'.format(500)
 G = Generator(gpu).to(device)
 G.load_state_dict(torch.load(model, map_location={'cuda:0': 'cpu'})['G'])
 
-img_path = '../Data/customize_test/romanhed.jpg'
+img_name = 'romanhed.jpg'
+img_path = '../Data/customize_test/'+img_name
 img = cv2.imread(img_path)
 size = (img.shape[1], img.shape[0])
 test_img = cv2.resize(img, (256, 256))
@@ -256,19 +257,23 @@ gen_lab_img = gen_lab_img.astype(np.uint8)
 # show test img
 gen_img = cv2.cvtColor(gen_lab_img, cv2.COLOR_LAB2RGB)  # for plt show use RGB channel not BGR
 
-plt.subplot(1, 3, 1)
-plt.title('Gray img')
-plt.imshow(cv2.resize(test_img_lab[..., 0], size), cmap='gray')
+# plt.subplot(1, 3, 1)
+# plt.title('Gray img')
+# plt.imshow(cv2.resize(test_img_lab[..., 0], size), cmap='gray')
+#
+# plt.subplot(1, 3, 2)
+# plt.title('Real img')
+# plt.imshow(cv2.resize(cv2.cvtColor(test_img, cv2.COLOR_BGR2RGB), size))
 
-plt.subplot(1, 3, 2)
-plt.title('Real img')
-plt.imshow(cv2.resize(cv2.cvtColor(test_img, cv2.COLOR_BGR2RGB), size))
-
-plt.subplot(1, 3, 3)
+# plt.subplot(1, 3, 3)
 plt.title('Fake img')
 plt.imshow(cv2.resize(gen_img, size))
-plt.show()
 
+# %%
+plt.savefig(img_name + '_' + str(500) + 'epochs' + '.png')
+
+# %%
+plt.show()
 # %% Print out the structure of Generator
 from torchviz import make_dot, make_dot_from_trace
 from graphviz import Source
