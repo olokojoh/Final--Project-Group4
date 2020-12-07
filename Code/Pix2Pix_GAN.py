@@ -48,21 +48,14 @@ sample_interval = 100
 checkpoint_interval = 338
 
 warnings.filterwarnings('ignore')
-# Mount Google Drive
-drive.mount('/content/drive')
-# Get absolute path
-abspath = '/content/drive/My Drive/Colab Notebooks/ML2Final_GAN/'
 DATA_DIR = os.getcwd()
-print(DATA_DIR)
-print(abspath)
-data_path =  abspath + 'Train_2'
-train_list = [f for f in os.listdir(data_path) if f[:-2] == "Train"]
+data_path =  '../Data'
 
 #In this class, root is the path of the file.
 class ImageDataset_color(Dataset):
   def __init__(self,root,transforms_=None,mode="train"):
-    self.transform = transforms.Compose(transforms_)#几个图像变换组合在一起，但是这里默认没有transform
-    self.files = sorted(glob.glob(root+"/*.*"))#用来查找目录和文件
+    self.transform = transforms.Compose(transforms_)#transform
+    self.files = sorted(glob.glob(root+"/*.*"))#dir
   def __getitem__(self,index):
     img_A = Image.fromarray(np.array(cv2.cvtColor(cv2.imread(self.files[index%len(self.files)]),cv2.COLOR_BGR2RGB)), "RGB")
     img_B = Image.fromarray(np.array(cv2.cvtColor(cv2.cvtColor(cv2.cvtColor(cv2.imread(self.files[index%len(self.files)]),cv2.COLOR_BGR2RGB),cv2.COLOR_RGB2GRAY),cv2.COLOR_GRAY2RGB)), "RGB")
@@ -73,8 +66,8 @@ class ImageDataset_color(Dataset):
     return len(self.files)
 
 transforms_=[transforms.Resize((256,256), Image.BICUBIC),transforms.ToTensor(),transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),]
-dataloader=DataLoader(ImageDataset_color("/content/drive/MyDrive/Colab Notebooks/ML2Final_GAN/Train_2/Train_2",transforms_=transforms_),batch_size=16,shuffle=True,num_workers=4,)
-val_dataloader=DataLoader(ImageDataset_color("/content/drive/MyDrive/Colab Notebooks/ML2Final_GAN/Train_2/Train_2",transforms_=transforms_,mode="test"),batch_size=10,shuffle=True,num_workers=1,)
+dataloader=DataLoader(ImageDataset_color(data_path,transforms_=transforms_),batch_size=16,shuffle=True,num_workers=4,)
+val_dataloader=DataLoader(ImageDataset_color(data_path,transforms_=transforms_,mode="test"),batch_size=10,shuffle=True,num_workers=1,)
 
 def weights_init_normal(m):
     classname = m.__class__.__name__
@@ -178,12 +171,13 @@ criterion_GAN = torch.nn.MSELoss()
 criterion_pixelwise = torch.nn.L1Loss()
 # Loss weight of L1 pixel-wise loss between translated image and real image
 lambda_pixel = 100 #
+
 # Calculate output of image discriminator (PatchGAN)
-patch = (1,16,16) #(1,16,16),opt.img_height // 2 ** 4, opt.img_width // 2 ** 4
+patch = (1,16,16) #(1,16,16),img_height // 2 ** 4, img_width // 2 ** 4
 # Initialize generator and discriminator
 generator = GeneratorUNet()
 discriminator = Discriminator()
-#如果有GPU,用GPU跑
+#if GPU is avaiable
 if cuda==True:
   generator = generator.cuda()
   discriminator = discriminator.cuda()
