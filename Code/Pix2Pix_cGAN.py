@@ -235,10 +235,7 @@ for epoch in range(0,n_epochs):
     loss_D_plot.append(loss_D)
     loss_D.backward()
     optimizer_D.step()
-    # --------------
-    #  Log Progress
-    # --------------
-    # Determine approximate time left
+    #  Log Progress # Determine approximate time left
     batches_done=epoch*len(dataloader) + i
     batches_left=n_epochs*len(dataloader)-batches_done
     time_left = datetime.timedelta(seconds=batches_left*(time.time()-prev_time))
