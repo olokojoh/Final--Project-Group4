@@ -6,7 +6,7 @@ This folder contains the source code of this project
 ### Training
  
  - To train GAN based on L\*a\*b\* color space. Simply run [Color_space_GAN .py](Color_space_GAN .py)
- - To train Pix2Pix GAN. Simply run [Pix2Pix_GAN.py](Pix2Pix_GAN.py)
+ - To train Pix2Pix GAN. Simply run [Pix2Pix_cGAN.py](Pix2Pix_GAN.py)
 
 ### Testing
 
