@@ -1,4 +1,4 @@
-# Data
+# Dataset
 This folder contains the dataset of this project.
 
 ## Quick Preview
