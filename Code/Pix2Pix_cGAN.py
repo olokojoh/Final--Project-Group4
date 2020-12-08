@@ -203,34 +203,27 @@ loss_D_plot=[]
 for epoch in range(0,n_epochs):
   print(epoch)
   for i, batch in enumerate(dataloader):
-    # Model inputs
+    # Model inputs,Adversarial ground truths
     real_A = Variable(batch["B"].type(Tensor))
     real_B = Variable(batch["A"].type(Tensor))
-    # Adversarial ground truths
     valid = Variable(Tensor(np.ones((real_A.size(0), *patch))), requires_grad=False)
     fake = Variable(Tensor(np.zeros((real_A.size(0), *patch))), requires_grad=False)
-    #Train Generators
+    #Train Generators # GAN loss
     optimizer_G.zero_grad()
-    # GAN loss
     fake_B = generator(real_A)
     pred_fake = discriminator(fake_B, real_A)
     loss_GAN = criterion_GAN(pred_fake, valid)
-    # Pixel-wise loss
     loss_pixel = criterion_pixelwise(fake_B,real_B)
-    # Total loss
     loss_G =lambda_pixel * loss_pixel+loss_GAN
     loss_G_plot.append(loss_G)
     loss_G.backward()
     optimizer_G.step()
-    # Train Discriminator
+    # Train Discriminator #loss
     optimizer_D.zero_grad()
-    # Real loss
     pred_real = discriminator(real_B,real_A)
     loss_real = criterion_GAN(pred_real,valid)
-    # Fake loss
     pred_fake = discriminator(fake_B.detach(),real_A)
     loss_fake = criterion_GAN(pred_fake, fake)
-    # Total loss
     loss_D = 0.5 * (loss_real + loss_fake)
     loss_D_plot.append(loss_D)
     loss_D.backward()
@@ -240,13 +233,10 @@ for epoch in range(0,n_epochs):
     batches_left=n_epochs*len(dataloader)-batches_done
     time_left = datetime.timedelta(seconds=batches_left*(time.time()-prev_time))
     prev_time = time.time()
-    # Print log
     sys.stdout.write("\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, pixel: %f, adv: %f] ETA: %s"%(epoch,n_epochs,i,len(dataloader),loss_D.item(),loss_G.item(),loss_pixel.item(),loss_GAN.item(),time_left,))
-    # If at sample interval save image
     if batches_done % sample_interval==0:
       sample_images(batches_done)
-  #if checkpoint_interval != -1 and epoch % checkpoint_interval==0:
-  torch.save(generator.state_dict(),DATA_DIR+"/generator_%d.pth"%epoch)
+  torch.save(generator.state_dict(),DATA_DIR+"/generator_%d.pth"%epoch)#if checkpoint_interval != -1 and epoch % checkpoint_interval==0:
   print("generator_%d.pth"%epoch + "saved")
   torch.save(discriminator.state_dict(),DATA_DIR+"/discriminator_%d.pth"%epoch)
     
