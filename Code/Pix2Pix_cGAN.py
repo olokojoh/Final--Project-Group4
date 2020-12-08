@@ -77,8 +77,7 @@ def weights_init_normal(m):
     elif classname.find("BatchNorm2d") != -1:
         torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
         torch.nn.init.constant_(m.bias.data, 0.0)
-#U-NET
-class UNetDown(nn.Module):
+class UNetDown(nn.Module):#U-NET
   def __init__(self, in_size, out_size, normalize=True, dropout=0.0):
       super(UNetDown, self).__init__()
       layers = [nn.Conv2d(in_size, out_size, 4, 2, 1, bias=False)]
@@ -119,13 +118,8 @@ class GeneratorUNet(nn.Module):
       self.up5 = UNetUp(1024, 256)
       self.up6 = UNetUp(512, 128)
       self.up7 = UNetUp(256, 64)
-      self.final = nn.Sequential(
-          nn.Upsample(scale_factor=2),
-          nn.ZeroPad2d((1, 0, 1, 0)),
-          nn.Conv2d(128, out_channels, 4, padding=1),
-          nn.Tanh(),)
+      self.final = nn.Sequential(nn.Upsample(scale_factor=2),nn.ZeroPad2d((1, 0, 1, 0)),nn.Conv2d(128, out_channels, 4, padding=1),nn.Tanh(),)
   def forward(self, x):
-      # U-Net generator with skip connections from encoder to decoder
       d1 = self.down1(x)
       d2 = self.down2(d1)
       d3 = self.down3(d2)
@@ -142,8 +136,7 @@ class GeneratorUNet(nn.Module):
       u6 = self.up6(u5,d2)
       u7 = self.up7(u6,d1)
       return self.final(u7)
-#Discriminator
-class Discriminator(nn.Module):
+class Discriminator(nn.Module):#Discriminator
     def __init__(self, in_channels=3):
         super(Discriminator, self).__init__()
         def discriminator_block(in_filters, out_filters, normalization=True):
@@ -153,18 +146,12 @@ class Discriminator(nn.Module):
                 layers.append(nn.InstanceNorm2d(out_filters))
             layers.append(nn.LeakyReLU(0.2, inplace=True))
             return layers
-        self.model = nn.Sequential(
-            *discriminator_block(in_channels * 2, 64, normalization=False),
-            *discriminator_block(64, 128),
-            *discriminator_block(128, 256),
-            *discriminator_block(256, 512),
-            nn.ZeroPad2d((1, 0, 1, 0)),
-            nn.Conv2d(512, 1, 4, padding=1, bias=False))
+        self.model = nn.Sequential(*discriminator_block(in_channels * 2, 64, normalization=False),*discriminator_block(64, 128),*discriminator_block(128, 256),*discriminator_block(256, 512),nn.ZeroPad2d((1, 0, 1, 0)),nn.Conv2d(512, 1, 4, padding=1, bias=False))
     def forward(self, img_A, img_B):
         # Concatenate image and condition image by channels to produce input
         img_input = torch.cat((img_A, img_B), 1)
         return self.model(img_input)
-
+    
 cuda = True if torch.cuda.is_available() else False
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 # Loss functions
@@ -174,7 +161,7 @@ criterion_pixelwise = torch.nn.L1Loss()
 lambda_pixel = 100 #
 
 # Calculate output of image discriminator (PatchGAN)
-patch = (1,16,16) #(1,16,16),img_height // 2 ** 4, img_width // 2 ** 4
+patch = (1,16,16) #(1,16,16),img_height // 2 ** 4, img_width // 2 ** 4 
 # Initialize generator and discriminator
 generator = GeneratorUNet()
 discriminator = Discriminator()
