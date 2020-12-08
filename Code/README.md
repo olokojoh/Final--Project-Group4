@@ -16,6 +16,6 @@ This folder contains the source code of this project
   
   *(Note: Due to the size limiation of Github repository, only epochs 1, 100, 200, 300, 400, 500 are available for testing)*
 
-**Pix2Pix GAN**
+**Conditional GAN (Image translation)**
   - Because the model is too large to upload onto github, people can get access to it by using google drive.
     https://drive.google.com/file/d/1KmwFMZxAyYgo5f8wohToARRqw4WIWfa6/view?usp=sharing
