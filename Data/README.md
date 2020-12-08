@@ -1,4 +1,4 @@
-# Group Proposal
+# Data
 This folder contains the dataset of this project.
 
 ## Quick Preview
